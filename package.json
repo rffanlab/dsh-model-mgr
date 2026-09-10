@@ -14,8 +14,6 @@
   "files": [
     "src/**/*.js",
     "lib/client.js",
-    "docs/**/*.md",
-    "scripts/*.mjs",
     "cordis.patch.yml",
     "README.md",
     "README.en.md",
@@ -25,8 +23,7 @@
   "scripts": {
     "test": "node --test",
     "check": "node --check src/core.js && node --check src/probe.js && node --check src/plugin.js && node --check lib/client.js",
-    "packcheck": "npm pack --dry-run --json",
-    "upstreamcheck": "node scripts/check-upstream-contract.mjs"
+    "packcheck": "npm pack --dry-run --json"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-llm": "*"
