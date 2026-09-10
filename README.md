@@ -4,15 +4,27 @@
 
 **给 DeepSeek Harness 原生模型配置补一个真正可用的 GUI：管理输入模态、Context Window、Max Tokens，并直接验证文本与视觉通路。**
 
-`README.md` 是默认文档。英文版见 [`README.en.md`](README.en.md)。
+`README.md` 是默认中文文档。英文版见 [`README.en.md`](README.en.md)。
 
 > “多模态（文本 + 图片）”是**向 DSH 声明模型/端点支持图片输入**，不是给原本不支持视觉的模型或推理服务凭空增加 Vision。
+
+## 当前版本
+
+当前版本：**0.1.1**。
+
+0.1.1 修复了首版 Web UI 可能完全不出现的问题，并提供两个入口：
+
+1. **主入口：设置 → 模型 → llm-pi-ai Provider 卡片 → 模型能力 · dsh-model-mgr**
+2. **兼容入口：设置 → 插件 → 模型能力**
+
+两个入口编辑的是同一份 DSH 原生 `llm-pi-ai` settings，不存在第二份配置。
 
 ## 功能
 
 当前版本覆盖开发规划的 P0～P4：
 
 - 使用官方 `settings.models.provider-card` keyed slot，不修改 Harness Web 核心；
+- 额外注册 `settings.plugins.tab` 兼容入口，避免不同 Harness Web 版本导致完全没有配置入口；
 - 只读写 DSH 原生 `llm-pi-ai` settings，不创建第二份模型数据库；
 - Provider `defaultInput`：纯文本 / 文本 + 图片；
 - 模型 `input`：继承 / 纯文本 / 文本 + 图片；
@@ -41,26 +53,60 @@ Web profile：
 dsh plugin --profile web add github:rffanlab/dsh-model-mgr
 ```
 
-升级：
+### 从 0.1.0 升级
+
+如果已经安装过首版，请升级：
 
 ```bash
 dsh plugin --profile web update dsh-model-mgr
 ```
 
+如果插件装在 `default` profile：
+
+```bash
+dsh plugin --profile default update dsh-model-mgr
+```
+
+然后**重启 DSH Web Host，并在浏览器执行一次强制刷新（Ctrl+F5）**。0.1.1 已提升 package version，用来避免继续复用 0.1.0 的旧 client bundle。
+
 插件通过 `cordis.patch.yml` 激活 Host half，同时通过 `dsh.client` 加载 Web client。
 
 ## 使用
 
+### 主入口：Models Provider 卡片
+
 打开：
 
 ```text
-Settings
-→ Models
-→ 一个 llm-pi-ai Provider
+设置
+→ 模型
+→ 展开一个 llm-pi-ai Provider
 → 模型能力 · dsh-model-mgr
 ```
 
-### Provider 默认输入能力
+能力区会直接出现在该 Provider 的原生模型编辑卡片中。
+
+### 兼容入口：插件页
+
+如果当前 Harness 的 Models 页面扩展机制发生变化，也可以打开：
+
+```text
+设置
+→ 插件
+→ 模型能力
+```
+
+这里会列出当前已配置的 `llm-pi-ai.providers.*`，提供同一套能力编辑器。
+
+如果**两个入口都没有出现**，说明不是 Provider 配置问题，而是 Web client bundle 没有被当前 profile 加载。优先检查：
+
+```bash
+dsh plugin --profile web update dsh-model-mgr
+```
+
+然后重启 Web Host、Ctrl+F5，再确认插件实际安装在哪个 profile。
+
+## Provider 默认输入能力
 
 可写为：
 
@@ -76,7 +122,7 @@ defaultInput: [text, image]
 
 `defaultInput` 是 fallback，不强制覆盖模型自己的 `input`。
 
-### 单模型输入能力
+## 单模型输入能力
 
 | UI | 原生 DSH 写入语义 |
 |---|---|
@@ -86,7 +132,7 @@ defaultInput: [text, image]
 
 插件不会根据 `Qwen-VL`、`Vision` 等名称自动猜能力。
 
-### Catalog 与自建模型
+## Catalog 与自建模型
 
 对于没有显式 `models` 列表、使用 pi-ai catalog 的 Provider，插件使用最小覆盖：
 
@@ -114,6 +160,8 @@ llm-pi-ai:
 ```
 
 保存使用嵌套 path patch，不会为了改 `input` 把 `compat`、reasoning 配置或其他未编辑字段抹掉。
+
+模型目录读取失败也不会让能力面板消失：对于显式 `models` 的 Provider，0.1.1 会直接从原生 settings 回退枚举模型。
 
 ## 文本测试
 
@@ -174,6 +222,22 @@ settingsScope.mutate(ops, expectedRevision)
 
 这样恢复继承是真正的 `unset`，并发修改发生时由 DSH settings 机制拒绝旧 revision，再刷新当前配置。
 
+## 0.1.1 Web UI 修复
+
+首版 UI 有两个脆弱点：
+
+- Client 代码会读取 `ctx.remote.session.modelCatalog()`，但运行时依赖没有显式声明 `remote.session`；
+- 早期 bundle 的 settings loading → ready 渲染路径存在 React Hook 顺序风险，slot 错误隔离后用户看到的结果可能只是“什么都没有”。
+
+0.1.1 做了以下修复：
+
+- client `inject` 显式加入 `remote.session`；
+- model catalog 读取失败只降级，不再影响显式模型配置 UI；
+- Provider 面板所有 React Hooks 无条件调用；
+- lazy-CJS wrapper 对齐已经实际使用的 `dsh-subagent-mgr` 结构；
+- 增加“设置 → 插件 → 模型能力”兼容入口；
+- 增加 client bundle smoke test，CI 会真正执行 bundle 并验证两个 slot 都完成注册。
+
 ## 安全边界
 
 - 不在前端读取、保存或展示 API Key；
@@ -185,13 +249,13 @@ settingsScope.mutate(ops, expectedRevision)
 - 不自动上传用户本地文件；
 - 所有能力修改都必须由用户明确保存。
 
-Host 只注册一个同源 POST 诊断端点：
+当前 Host 诊断接口为：
 
 ```text
 /plugins/dsh-model-mgr/probe
 ```
 
-它只接受 `provider`、`model` 和 `kind: text|vision`，凭据始终留在 Harness Host。
+它只接受 `provider`、`model` 和 `kind: text|vision`，凭据始终留在 Harness Host。后续版本会继续收紧诊断 transport 的访问控制边界。
 
 ## 当前范围
 
@@ -209,9 +273,7 @@ npm run check
 npm run packcheck
 ```
 
-当前单元测试覆盖：输入能力映射、继承 unset、显式 `models` 的 nested path、catalog `modelOverrides` 路径、正整数校验，以及视觉诊断分层。
-
-在真实 Harness 环境发布前还应执行一次 Web smoke test：打开 Settings → Models，保存一个测试 Provider，再分别运行文本和视觉测试。
+当前测试覆盖：输入能力映射、继承 unset、显式 `models` 的 nested path、catalog `modelOverrides` 路径、正整数校验、视觉诊断分层，以及 Web client bundle 的实际加载和两个 UI slot 注册。
 
 ## 项目结构
 
@@ -224,7 +286,8 @@ dsh-model-mgr/
 ├─ lib/
 │  └─ client.js     # DSH lazy-CJS Web client
 ├─ test/
-│  └─ core.test.js
+│  ├─ core.test.js
+│  └─ client-bundle.test.js
 ├─ README.md        # 默认中文
 ├─ README.en.md     # English
 ├─ package.json
