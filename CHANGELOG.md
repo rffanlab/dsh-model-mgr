@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.2 - 2026-09-10
+
+- Keep model capability rows collapsed by default, matching the native DeepSeek Harness model-list disclosure behavior.
+- Add a compact collapsed summary row showing model identity and stored capability/capacity hints; input mode, capacities, probes, and save actions appear only after expanding that row.
+- Keep Provider cards collapsed by default in the compatibility **Settings → Plugins → Model capabilities** entry instead of rendering every Provider body at once.
+- Fix vision probing on Harness installations whose attachment provider does not expose the newer `admitPromptContent()` helper.
+- Add attachment API compatibility fallback order: `admitPromptContent()` → `saveImages()` → `saveImage()`.
+- Classify image-admission/storage failures as a DSH attachment-layer failure instead of incorrectly labeling them as a Provider inference failure.
+
 ## 0.1.1 - 2026-09-10
 
 - Fix the Web client activation contract by declaring the `remote.session` runtime dependency used by model-catalog loading.
