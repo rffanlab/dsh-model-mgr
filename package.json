@@ -1,0 +1,68 @@
+{
+  "name": "dsh-model-mgr",
+  "version": "0.1.0",
+  "description": "Native model capability GUI and text/vision diagnostics for DeepSeek Harness",
+  "type": "module",
+  "main": "./src/plugin.js",
+  "exports": {
+    ".": "./src/plugin.js",
+    "./client": "./lib/client.js",
+    "./core": "./src/core.js",
+    "./probe": "./src/probe.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src/**/*.js",
+    "lib/client.js",
+    "docs/**/*.md",
+    "scripts/*.mjs",
+    "cordis.patch.yml",
+    "README.md",
+    "README.en.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/core.js && node --check src/probe.js && node --check src/plugin.js && node --check lib/client.js",
+    "packcheck": "npm pack --dry-run --json",
+    "upstreamcheck": "node scripts/check-upstream-contract.mjs"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-llm": "*"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rffanlab/dsh-model-mgr.git"
+  },
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "model",
+    "vision",
+    "multimodal",
+    "vllm",
+    "lm-studio",
+    "plugin"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings-models",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-session",
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-api-remotes"
+      ]
+    }
+  }
+}
