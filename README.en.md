@@ -8,11 +8,23 @@ The default project documentation is the Chinese [`README.md`](README.md). This 
 
 > “Multimodal (text + image)” means **declaring to DSH that the model/endpoint accepts image input**. It cannot make a text-only model or inference server magically gain vision support.
 
+## Current release
+
+Current version: **0.1.1**.
+
+0.1.1 fixes the case where the first Web UI build could disappear entirely and now provides two entry points:
+
+1. **Primary:** Settings → Models → an llm-pi-ai Provider → Model capabilities · dsh-model-mgr
+2. **Compatibility:** Settings → Plugins → Model capabilities
+
+Both surfaces edit the same native DSH `llm-pi-ai` settings. There is no shadow configuration.
+
 ## Features
 
 The current release covers P0–P4 of the development plan:
 
 - Extends the official `settings.models.provider-card` keyed slot without modifying Harness Web core.
+- Adds a `settings.plugins.tab` compatibility entry so a Models-page slot mismatch does not leave the plugin with no UI.
 - Reads and writes only native DSH `llm-pi-ai` settings; no shadow model database.
 - Provider `defaultInput`: text or text + image.
 - Per-model `input`: inherit, text, or text + image.
@@ -41,26 +53,54 @@ Web profile:
 dsh plugin --profile web add github:rffanlab/dsh-model-mgr
 ```
 
-Upgrade:
+### Upgrade from 0.1.0
+
+If the first release is already installed:
 
 ```bash
 dsh plugin --profile web update dsh-model-mgr
 ```
 
+Or, when installed in the default profile:
+
+```bash
+dsh plugin --profile default update dsh-model-mgr
+```
+
+Then **restart the DSH Web Host and perform one hard browser refresh (Ctrl+F5)**. The package version was bumped to 0.1.1 so an existing install does not keep stale 0.1.0 client bytes.
+
 `cordis.patch.yml` activates the Host half and `dsh.client` loads the Web client.
 
 ## Usage
+
+### Primary Models entry
 
 Open:
 
 ```text
 Settings
 → Models
-→ an llm-pi-ai Provider
+→ expand an llm-pi-ai Provider
 → Model capabilities · dsh-model-mgr
 ```
 
-### Provider default input
+The capability editor is rendered directly inside that Provider's native card.
+
+### Compatibility Plugins entry
+
+If the current Harness build changes or omits the Models provider-card extension seat, open:
+
+```text
+Settings
+→ Plugins
+→ Model capabilities
+```
+
+This view lists configured `llm-pi-ai.providers.*` and exposes the same capability editor.
+
+If **neither entry appears**, the issue is not a Provider setting. It means the Web client bundle is not loaded by the active profile. Update the plugin in the correct profile, restart the Web Host, hard-refresh the browser, and confirm which profile owns the plugin.
+
+## Provider default input
 
 The UI writes either:
 
@@ -76,7 +116,7 @@ defaultInput: [text, image]
 
 `defaultInput` is a fallback. It does not forcibly override a model's explicit `input`.
 
-### Per-model input capability
+## Per-model input capability
 
 | UI | Native DSH write semantics |
 |---|---|
@@ -86,7 +126,7 @@ defaultInput: [text, image]
 
 The plugin never infers capabilities from names such as `Qwen-VL` or `Vision`.
 
-### Catalog-backed vs explicit models
+## Catalog-backed vs explicit models
 
 For a provider that uses the pi-ai catalog and has no explicit `models` list, the plugin uses a minimal override:
 
@@ -114,6 +154,8 @@ llm-pi-ai:
 ```
 
 Writes use nested path operations, so changing `input` does not erase `compat`, reasoning settings, or other untouched fields.
+
+A model-catalog failure no longer removes the capability UI. For explicit `models` providers, 0.1.1 falls back to the native settings model list.
 
 ## Text probe
 
@@ -174,6 +216,15 @@ settingsScope.mutate(ops, expectedRevision)
 
 “Inherit” is represented by a real `unset`, while stale revisions are rejected by the DSH settings mechanism and the current settings are refreshed.
 
+## 0.1.1 Web UI fix
+
+The first release had two fragile client-side paths:
+
+- it called `ctx.remote.session.modelCatalog()` without explicitly declaring the `remote.session` runtime dependency;
+- an early bundle revision had a loading → ready React Hook-order hazard that could cause the slot error boundary to retire the extension and leave an apparently empty UI.
+
+0.1.1 fixes this by declaring `remote.session`, making catalog loading non-fatal, keeping all Provider-panel hooks unconditional, aligning the lazy-CJS wrapper with the already proven `dsh-subagent-mgr` shape, adding the Plugins compatibility entry, and adding a smoke test that executes the bundle and verifies both slot registrations.
+
 ## Security boundaries
 
 - Never read, store, or display API keys in browser code.
@@ -185,13 +236,13 @@ settingsScope.mutate(ops, expectedRevision)
 - Never upload arbitrary local user files automatically.
 - Capability changes take effect only after an explicit user save.
 
-The Host registers one same-origin POST diagnostics endpoint:
+The current Host diagnostics endpoint is:
 
 ```text
 /plugins/dsh-model-mgr/probe
 ```
 
-It accepts only `provider`, `model`, and `kind: text|vision`; credentials remain on the Harness Host.
+It accepts only `provider`, `model`, and `kind: text|vision`; credentials remain on the Harness Host. A later release can further tighten the diagnostics transport access-control boundary.
 
 ## Scope
 
@@ -209,9 +260,7 @@ npm run check
 npm run packcheck
 ```
 
-Current unit tests cover input-mode mapping, inherit-as-unset, nested explicit-model paths, catalog `modelOverrides` paths, positive-integer validation, and layered vision-result classification.
-
-Before release against a real Harness installation, run a Web smoke test: open Settings → Models, save a test Provider, then run both text and vision probes.
+Tests cover input-mode mapping, inherit-as-unset, nested explicit-model paths, catalog `modelOverrides` paths, positive-integer validation, layered vision classification, and execution of the Web client bundle with verification of both UI slot registrations.
 
 ## Project layout
 
@@ -224,7 +273,8 @@ dsh-model-mgr/
 ├─ lib/
 │  └─ client.js     # DSH lazy-CJS Web client
 ├─ test/
-│  └─ core.test.js
+│  ├─ core.test.js
+│  └─ client-bundle.test.js
 ├─ README.md        # default Chinese docs
 ├─ README.en.md     # English docs
 ├─ package.json
