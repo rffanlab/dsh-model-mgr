@@ -1,0 +1,4 @@
+# Installing dsh-model-mgr activates both its Host probe and Web client bundle.
+- insert:
+    - id: dsh-model-mgr
+      name: 'dsh-model-mgr'
