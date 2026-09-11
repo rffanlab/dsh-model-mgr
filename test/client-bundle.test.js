@@ -56,3 +56,11 @@ test('client bundle loads and registers primary plus compatibility settings entr
   assert.equal(registered[1].options.name, 'settings.plugins.tab')
   assert.equal(registered[1].options.label, '模型能力')
 })
+
+test('provider capability panel and model rows are both collapsed by default', async () => {
+  const code = await readFile(new URL('../lib/client.js', import.meta.url), 'utf8')
+  assert.match(code, /const \[panelOpen, setPanelOpen\] = React\.useState\(false\)/)
+  assert.match(code, /const \[open, setOpen\] = React\.useState\(false\)/)
+  assert.doesNotMatch(code, /const bodyVisible = !standalone \|\| standaloneOpen/)
+  assert.match(code, /panelOpen \? h\('div', \{ key: 'body'/)
+})
