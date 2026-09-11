@@ -57,10 +57,12 @@ test('client bundle loads and registers primary plus compatibility settings entr
   assert.equal(registered[1].options.label, '模型能力')
 })
 
-test('provider capability panel and model rows are both collapsed by default', async () => {
+test('capability UI is collapsed-first and per-model only', async () => {
   const code = await readFile(new URL('../lib/client.js', import.meta.url), 'utf8')
-  assert.match(code, /const \[panelOpen, setPanelOpen\] = React\.useState\(false\)/)
-  assert.match(code, /const \[open, setOpen\] = React\.useState\(false\)/)
-  assert.doesNotMatch(code, /const bodyVisible = !standalone \|\| standaloneOpen/)
-  assert.match(code, /panelOpen \? h\('div', \{ key: 'body'/)
+  const falseStates = code.match(/React\.useState\(false\)/g) ?? []
+  assert.ok(falseStates.length >= 2, 'provider panel and model row must both start collapsed')
+  assert.match(code, /按模型单独配置/)
+  assert.match(code, /不会修改 Provider 默认能力/)
+  assert.doesNotMatch(code, /保存默认值/)
+  assert.match(code, /清除系列级多模态默认/)
 })
