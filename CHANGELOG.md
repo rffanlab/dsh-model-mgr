@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.5 - 2026-09-11
+
+- Fix `client api: settings/mutate rejected "ops"` when editing an explicit custom Provider model.
+- Align with DSH `SettingsPathOpView`, whose `path` is strictly `string[]`; numeric array indexes are no longer sent over the settings Remote.
+- For explicit `providers.<id>.models` arrays, clone the full effective array, modify only the selected row, preserve unknown fields and untouched rows, then `set` the whole `models` array exactly like the native Models editor.
+- Keep catalog-backed model edits minimal under `modelOverrides.<modelId>` where every path segment is naturally a string.
+- Add a client-bundle regression test that verifies every emitted settings path segment is a string and that explicit-model edits preserve `compat`, reasoning metadata, and sibling rows.
+
 ## 0.1.4 - 2026-09-11
 
 - Remove the normal Provider-level `defaultInput` editor. Capability changes are now per-model only.
