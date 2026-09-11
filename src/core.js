@@ -28,11 +28,18 @@ export function inputForMode(mode) {
   return undefined
 }
 
+export function assertSettingsPath(path) {
+  if (!Array.isArray(path) || path.some(segment => typeof segment !== 'string')) {
+    throw new TypeError('DSH settings paths must contain only string segments')
+  }
+  return path
+}
+
 export function providerPath(entry) {
   if (!entry || !Array.isArray(entry.settingsPath) || entry.settingsPath.length === 0) {
     throw new Error('Provider does not expose a writable settingsPath')
   }
-  return [...entry.settingsPath]
+  return [...assertSettingsPath(entry.settingsPath)]
 }
 
 export function resolveEditableModels(profile) {
@@ -49,26 +56,44 @@ export function resolveEditableModels(profile) {
 }
 
 export function modelFieldPath(providerSettingsPath, model, field) {
-  if (model.kind === 'models') return [...providerSettingsPath, 'models', model.index, field]
-  if (model.kind === 'override') return [...providerSettingsPath, 'modelOverrides', model.id, field]
+  const provider = assertSettingsPath(providerSettingsPath)
+  if (model.kind === 'models') {
+    throw new Error('Explicit models are arrays; DSH wire paths are string-only. Replace the models array instead of addressing an index.')
+  }
+  if (model.kind === 'override') return [...provider, 'modelOverrides', model.id, field]
   throw new Error(`Unsupported model edit kind: ${String(model?.kind)}`)
 }
 
 export function providerFieldPath(providerSettingsPath, field) {
-  return [...providerSettingsPath, field]
+  return [...assertSettingsPath(providerSettingsPath), field]
 }
 
 export function createSetOp(path, value) {
-  return { op: 'set', path: [...path], value: cloneJson(value) }
+  return { op: 'set', path: [...assertSettingsPath(path)], value: cloneJson(value) }
 }
 
 export function createUnsetOp(path) {
-  return { op: 'unset', path: [...path] }
+  return { op: 'unset', path: [...assertSettingsPath(path)] }
 }
 
 export function createInputOp(path, mode) {
   const value = inputForMode(mode)
   return value === undefined ? createUnsetOp(path) : createSetOp(path, value)
+}
+
+export function createExplicitModelOp(providerSettingsPath, models, index, changes) {
+  const provider = assertSettingsPath(providerSettingsPath)
+  if (!Array.isArray(models) || !models[index] || typeof models[index] !== 'object') {
+    throw new Error('Explicit model row is not available')
+  }
+  const next = cloneJson(models)
+  const row = { ...next[index] }
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === undefined) delete row[key]
+    else row[key] = cloneJson(value)
+  }
+  next[index] = row
+  return createSetOp([...provider, 'models'], next)
 }
 
 export function positiveIntegerOrUndefined(value) {
