@@ -1,3 +1,92 @@
-/** Stable PNG fixture used by the vision-path probe. */
+import { deflateSync } from 'node:zlib'
+
 export const VISION_SENTINEL = 'VISION_427'
-export const VISION_TEST_PNG_BASE64 = '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'
+
+const WIDTH = 320
+const HEIGHT = 96
+const SCALE = 5
+const GLYPHS = {
+  V: ['10001','10001','10001','10001','01010','01010','00100'],
+  I: ['11111','00100','00100','00100','00100','00100','11111'],
+  S: ['01111','10000','10000','01110','00001','00001','11110'],
+  O: ['01110','10001','10001','10001','10001','10001','01110'],
+  N: ['10001','11001','11001','10101','10011','10011','10001'],
+  _: ['00000','00000','00000','00000','00000','00000','11111'],
+  '4': ['00010','00110','01010','10010','11111','00010','00010'],
+  '2': ['01110','10001','00001','00010','00100','01000','11111'],
+  '7': ['11111','00001','00010','00100','01000','01000','01000'],
+}
+
+function crc32(buffer) {
+  let crc = 0xffffffff
+  for (const byte of buffer) {
+    crc ^= byte
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1))
+  }
+  return (crc ^ 0xffffffff) >>> 0
+}
+
+function chunk(type, data = Buffer.alloc(0)) {
+  const name = Buffer.from(type, 'ascii')
+  const length = Buffer.alloc(4)
+  length.writeUInt32BE(data.length)
+  const crc = Buffer.alloc(4)
+  crc.writeUInt32BE(crc32(Buffer.concat([name, data])))
+  return Buffer.concat([length, name, data, crc])
+}
+
+function buildPixels() {
+  const stride = 1 + WIDTH * 3
+  const raw = Buffer.alloc(stride * HEIGHT, 0xff)
+  for (let y = 0; y < HEIGHT; y++) raw[y * stride] = 0
+
+  const chars = [...VISION_SENTINEL]
+  const glyphWidth = 5 * SCALE
+  const spacing = SCALE
+  const totalWidth = chars.length * glyphWidth + (chars.length - 1) * spacing
+  const totalHeight = 7 * SCALE
+  const x0 = Math.floor((WIDTH - totalWidth) / 2)
+  const y0 = Math.floor((HEIGHT - totalHeight) / 2)
+
+  chars.forEach((char, charIndex) => {
+    const glyph = GLYPHS[char]
+    if (!glyph) throw new Error(`missing vision fixture glyph: ${char}`)
+    glyph.forEach((row, gy) => {
+      ;[...row].forEach((pixel, gx) => {
+        if (pixel !== '1') return
+        for (let dy = 0; dy < SCALE; dy++) {
+          for (let dx = 0; dx < SCALE; dx++) {
+            const x = x0 + charIndex * (glyphWidth + spacing) + gx * SCALE + dx
+            const y = y0 + gy * SCALE + dy
+            const at = y * stride + 1 + x * 3
+            raw[at] = 0
+            raw[at + 1] = 0
+            raw[at + 2] = 0
+          }
+        }
+      })
+    })
+  })
+  return raw
+}
+
+function buildPng() {
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(WIDTH, 0)
+  ihdr.writeUInt32BE(HEIGHT, 4)
+  ihdr[8] = 8
+  ihdr[9] = 2
+  ihdr[10] = 0
+  ihdr[11] = 0
+  ihdr[12] = 0
+  return Buffer.concat([
+    signature,
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(buildPixels(), { level: 9 })),
+    chunk('IEND'),
+  ])
+}
+
+export const VISION_TEST_PNG_BYTES = buildPng()
+export const VISION_TEST_PNG_BASE64 = VISION_TEST_PNG_BYTES.toString('base64')
