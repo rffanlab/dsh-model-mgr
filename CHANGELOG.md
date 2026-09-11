@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3 - 2026-09-11
+
+- Fix the remaining default-expanded behavior in the primary **Settings → Models** integration.
+- Collapse the entire `模型能力 · dsh-model-mgr` section by default instead of immediately rendering the full capability model list inside every opened Provider card.
+- Keep the existing second disclosure level: after opening the capability section, every individual model row is still collapsed until its own chevron is clicked.
+- Use the same collapsed-first behavior in the compatibility **Settings → Plugins → 模型能力** surface.
+- Add a regression check that asserts both Provider capability panels and individual model rows start with `useState(false)`.
+
 ## 0.1.2 - 2026-09-10
 
 - Keep model capability rows collapsed by default, matching the native DeepSeek Harness model-list disclosure behavior.
