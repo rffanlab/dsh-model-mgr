@@ -1,12 +1,22 @@
 # Changelog
 
+## 0.1.4 - 2026-09-11
+
+- Remove the normal Provider-level `defaultInput` editor. Capability changes are now per-model only.
+- Keep both Provider capability panels and individual model rows collapsed by default.
+- Detect legacy `defaultInput: [text, image]` values written by earlier releases and offer an explicit one-click cleanup instead of silently mutating user settings.
+- Replace the truncated vision-test PNG with a complete 320×96 RGB PNG that visibly contains `VISION_427`.
+- Keep attachment compatibility across `admitPromptContent()` → `saveImages()` → `saveImage()`.
+- Add a PNG integrity regression test that parses chunks and inflates IDAT data, preventing malformed/truncated fixtures from shipping again.
+- Add client-bundle regression checks that reject a Provider-level “save default” control and require per-model-only copy.
+
 ## 0.1.3 - 2026-09-11
 
 - Fix the remaining default-expanded behavior in the primary **Settings → Models** integration.
 - Collapse the entire `模型能力 · dsh-model-mgr` section by default instead of immediately rendering the full capability model list inside every opened Provider card.
 - Keep the existing second disclosure level: after opening the capability section, every individual model row is still collapsed until its own chevron is clicked.
 - Use the same collapsed-first behavior in the compatibility **Settings → Plugins → 模型能力** surface.
-- Add a regression check that asserts both Provider capability panels and individual model rows start with `useState(false)`.
+- Add a regression check that asserts both Provider capability panels and individual model rows start collapsed.
 
 ## 0.1.2 - 2026-09-10
 
