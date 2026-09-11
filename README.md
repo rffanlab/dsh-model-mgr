@@ -2,80 +2,26 @@
 
 中文 | [English](README.en.md)
 
-**给 DeepSeek Harness 原生模型配置补一个真正可用的 GUI：管理输入模态、Context Window、Max Tokens，并直接验证文本与视觉通路。**
+给 DeepSeek Harness 的原生模型配置补一个轻量 GUI：**按模型**管理输入模态、Context Window、Max Tokens，并直接验证文本与视觉通路。
 
-`README.md` 是默认中文文档。英文版见 [`README.en.md`](README.en.md)。
-
-> “多模态（文本 + 图片）”是**向 DSH 声明模型/端点支持图片输入**，不是给原本不支持视觉的模型或推理服务凭空增加 Vision。
+> “文本 + 图片”只是向 DSH 声明这个模型/端点接受图片输入，不会让原本不支持视觉的模型或推理服务凭空获得 Vision。
 
 ## 当前版本
 
-当前版本：**0.1.1**。
+当前版本：**0.1.4**。
 
-0.1.1 修复了首版 Web UI 可能完全不出现的问题，并提供两个入口：
+0.1.4 的重点是降低侵入性并修复视觉测试：
 
-1. **主入口：设置 → 模型 → llm-pi-ai Provider 卡片 → 模型能力 · dsh-model-mgr**
-2. **兼容入口：设置 → 插件 → 模型能力**
+- 不再提供 Provider 级“默认多模态”常规开关；
+- 只对单个模型写 `input`；
+- Provider 能力区默认收起，模型行也默认收起；
+- 检测旧版本留下的 `defaultInput: [text, image]` 时，只显示清理提示，不会自动修改；
+- 替换了之前被截断的测试 PNG；
+- CI 会校验 PNG chunk 和 IDAT 解压，避免再次发布坏图片。
 
-两个入口编辑的是同一份 DSH 原生 `llm-pi-ai` settings，不存在第二份配置。
+## 入口
 
-## 功能
-
-当前版本覆盖开发规划的 P0～P4：
-
-- 使用官方 `settings.models.provider-card` keyed slot，不修改 Harness Web 核心；
-- 额外注册 `settings.plugins.tab` 兼容入口，避免不同 Harness Web 版本导致完全没有配置入口；
-- 只读写 DSH 原生 `llm-pi-ai` settings，不创建第二份模型数据库；
-- Provider `defaultInput`：纯文本 / 文本 + 图片；
-- 模型 `input`：继承 / 纯文本 / 文本 + 图片；
-- `contextWindow` 与 `maxTokens`；
-- `settingsScope.mutate(..., expectedRevision)` 的 revision-aware 保存；
-- 对显式 `models` 只修改目标字段，保留其他字段；
-- 对内置 catalog 优先写 `modelOverrides.<modelId>`，不复制整份 catalog；
-- 一键文本连接测试；
-- 一键视觉通路测试；
-- 视觉失败区分 DSH 声明层、Provider/推理服务层、模型识别层；
-- API Key 不进入插件前端。
-
-Reasoning / Thinking 暂不加入第一版，因为 DSH 的推理能力还涉及 reasoning effort、thinking format、chat template kwargs 等协议行为，不能安全简化为一个开关。
-
-## 安装
-
-默认 profile：
-
-```bash
-dsh plugin --profile default add github:rffanlab/dsh-model-mgr
-```
-
-Web profile：
-
-```bash
-dsh plugin --profile web add github:rffanlab/dsh-model-mgr
-```
-
-### 从 0.1.0 升级
-
-如果已经安装过首版，请升级：
-
-```bash
-dsh plugin --profile web update dsh-model-mgr
-```
-
-如果插件装在 `default` profile：
-
-```bash
-dsh plugin --profile default update dsh-model-mgr
-```
-
-然后**重启 DSH Web Host，并在浏览器执行一次强制刷新（Ctrl+F5）**。0.1.1 已提升 package version，用来避免继续复用 0.1.0 的旧 client bundle。
-
-插件通过 `cordis.patch.yml` 激活 Host half，同时通过 `dsh.client` 加载 Web client。
-
-## 使用
-
-### 主入口：Models Provider 卡片
-
-打开：
+主入口：
 
 ```text
 设置
@@ -84,11 +30,7 @@ dsh plugin --profile default update dsh-model-mgr
 → 模型能力 · dsh-model-mgr
 ```
 
-能力区会直接出现在该 Provider 的原生模型编辑卡片中。
-
-### 兼容入口：插件页
-
-如果当前 Harness 的 Models 页面扩展机制发生变化，也可以打开：
+兼容入口：
 
 ```text
 设置
@@ -96,45 +38,56 @@ dsh plugin --profile default update dsh-model-mgr
 → 模型能力
 ```
 
-这里会列出当前已配置的 `llm-pi-ai.providers.*`，提供同一套能力编辑器。
+两个入口编辑的是同一份 DSH 原生 `llm-pi-ai` settings，没有第二份配置。
 
-如果**两个入口都没有出现**，说明不是 Provider 配置问题，而是 Web client bundle 没有被当前 profile 加载。优先检查：
+## 交互
 
-```bash
-dsh plugin --profile web update dsh-model-mgr
+插件采用两级折叠：
+
+```text
+模型能力 · dsh-model-mgr                         >
 ```
 
-然后重启 Web Host、Ctrl+F5，再确认插件实际安装在哪个 profile。
+点开后才看到模型列表：
 
-## Provider 默认输入能力
-
-可写为：
-
-```yaml
-defaultInput: [text]
+```text
+qwen3.8-27b · 继承 DSH 默认/目录                >
+qwen-vl      · 文本 + 图片                      >
 ```
 
-或：
+再点某个模型，才显示：
 
-```yaml
-defaultInput: [text, image]
-```
-
-`defaultInput` 是 fallback，不强制覆盖模型自己的 `input`。
+- 输入能力
+- Context Window
+- Max Tokens
+- 测试文本
+- 测试视觉
+- 保存 / 恢复继承
 
 ## 单模型输入能力
 
 | UI | 原生 DSH 写入语义 |
 |---|---|
-| 继承默认值 | `unset` 模型自己的 `input` |
+| 继承 DSH 默认/目录 | `unset` 模型自己的 `input` |
 | 纯文本 | `input: [text]` |
 | 多模态（文本 + 图片） | `input: [text, image]` |
 
-插件不会根据 `Qwen-VL`、`Vision` 等名称自动猜能力。
+插件不会根据 `Qwen-VL`、`Vision` 等名字自动猜能力。
 
-## Catalog 与自建模型
+对于显式 `models` 的自建 Provider，会写目标模型本身：
 
-对于没有显式 `models` 列表、使用 pi-ai catalog 的 Provider，插件使用最小覆盖：
+```yaml
+llm-pi-ai:
+  providers:
+    local-vllm:
+      models:
+        - id: qwen-model
+          input: [text, image]
+          contextWindow: 131072
+          maxTokens: 32768
+```
+
+对于使用内置 catalog 的 Provider，会使用最小 `modelOverrides`：
 
 ```yaml
 llm-pi-ai:
@@ -146,97 +99,87 @@ llm-pi-ai:
           contextWindow: 131072
 ```
 
-对于显式声明模型的自建 Provider：
+插件使用 nested path patch，不会为了改 `input` 把 `compat`、reasoning 或其他未编辑字段抹掉。
+
+## Provider 默认能力
+
+0.1.4 开始，插件**不再提供 Provider 级 `defaultInput` 编辑器**。
+
+DSH 自己的 `defaultInput` 默认是 `[text]`，而且只是 fallback。这个插件的目标是“按模型声明能力”，所以不再鼓励把整个 Provider 一次性改成多模态。
+
+如果旧版本已经写入：
 
 ```yaml
-llm-pi-ai:
-  providers:
-    local-vllm:
-      models:
-        - id: qwen-model
-          contextWindow: 131072
-          maxTokens: 32768
-          input: [text, image]
+defaultInput: [text, image]
 ```
 
-保存使用嵌套 path patch，不会为了改 `input` 把 `compat`、reasoning 配置或其他未编辑字段抹掉。
+能力面板会显示一次警告，并提供：
 
-模型目录读取失败也不会让能力面板消失：对于显式 `models` 的 Provider，0.1.1 会直接从原生 settings 回退枚举模型。
+```text
+清除系列级多模态默认
+```
+
+这个按钮会 `unset defaultInput`，恢复 DSH 原生默认/目录行为；插件不会自动替你修改。
 
 ## 文本测试
 
-点击 **测试文本** 后，Host 通过当前 DSH `ctx.llm` 路由发送一个最小请求：
+点击 **测试文本** 后，Host 通过当前 DSH `ctx.llm` 路由发送最小请求：
 
 ```text
 只回复 MODEL_OK
 ```
 
-显示返回正文、耗时以及 Provider 错误信息。是否严格等于 `MODEL_OK` 只作为辅助信息，不把生成质量混进连接测试。
+UI 会显示连接是否成功、耗时以及 Provider 错误。
 
 ## 视觉测试
 
 点击 **测试视觉** 后：
 
-1. Host 先调用 `ctx.llm.resolveModelInfo(provider, model)`；
-2. 若 `inputModalities` 没有 `image`，立即返回 **DSH 层失败**，不会发送测试图片；
-3. 若已声明图片能力，通过现有 `ctx.attachments.admitPromptContent()` 接纳插件内置的小 PNG；
-4. 图片内容为 `VISION_427`；
-5. 再通过同一个 `ctx.llm` Provider/Model 路由请求模型读取图片；
-6. 根据结果区分 Provider 拒绝与识别不匹配。
+1. `ctx.llm.resolveModelInfo(provider, model)` 先确认 DSH 是否声明 `image`；
+2. 没有 `image` 时直接返回 DSH 层失败，不发送图片；
+3. 使用插件内置、CI 校验过的 320×96 RGB PNG，图片内容是 `VISION_427`；
+4. 图片准入兼容以下 DSH attachment API：
+   - `admitPromptContent()`
+   - `saveImages()`
+   - `saveImage()`
+5. 再通过同一 Provider / Model 路由发送视觉请求；
+6. 根据结果区分 DSH、Provider 和模型识别三个层次。
 
-### 三层诊断
+诊断语义：
+
+- **DSH 层失败**：模型未声明图片输入，或图片在 DSH attachment 准入/持久化阶段失败；
+- **Provider 层失败**：图片已经交给 DSH，但推理服务器 / endpoint 拒绝或中断请求；
+- **模型层识别异常**：请求成功，图片通路已经走通，但回答没有识别出 `VISION_427`；
+- **视觉通路正常**：模型成功返回 `VISION_427`。
+
+旧版出现过：
 
 ```text
-模型本身支持 Vision
-        ↓
-推理服务实际加载 Vision
-        ↓
-DSH 配置声明 image 输入
+Unsupported or malformed image data
 ```
 
-- **DSH 层失败**：当前模型没有声明图片输入，图片根本不会发往 Provider；
-- **Provider 层失败**：DSH 已允许图片，但推理服务 / endpoint 拒绝或中断；
-- **模型层识别异常**：请求成功，说明图片通路已走通，但回答不是 `VISION_427`。
+原因是插件内置 PNG 数据被截断。0.1.4 已替换为完整 PNG，并新增解压级回归测试。
 
-所以：
+## 保存与并发
 
-```yaml
-input: [text, image]
-```
-
-只是能力声明，不是“开启视觉魔法”。
-
-## 保存与冲突处理
-
-插件不直接读取、正则修改或整文件覆盖 `settings.yaml`。浏览器端绑定：
+浏览器端只绑定 DSH 原生 namespace：
 
 ```text
 settingsScope.bind({ namespace: "llm-pi-ai" })
 ```
 
-保存时提交结构化 nested path operations，并携带当前 revision：
+保存通过：
 
 ```text
 settingsScope.mutate(ops, expectedRevision)
 ```
 
-这样恢复继承是真正的 `unset`，并发修改发生时由 DSH settings 机制拒绝旧 revision，再刷新当前配置。
+所以：
 
-## 0.1.1 Web UI 修复
-
-首版 UI 有两个脆弱点：
-
-- Client 代码会读取 `ctx.remote.session.modelCatalog()`，但运行时依赖没有显式声明 `remote.session`；
-- 早期 bundle 的 settings loading → ready 渲染路径存在 React Hook 顺序风险，slot 错误隔离后用户看到的结果可能只是“什么都没有”。
-
-0.1.1 做了以下修复：
-
-- client `inject` 显式加入 `remote.session`；
-- model catalog 读取失败只降级，不再影响显式模型配置 UI；
-- Provider 面板所有 React Hooks 无条件调用；
-- lazy-CJS wrapper 对齐已经实际使用的 `dsh-subagent-mgr` 结构；
-- 增加“设置 → 插件 → 模型能力”兼容入口；
-- 增加 client bundle smoke test，CI 会真正执行 bundle 并验证两个 slot 都完成注册。
+- 恢复继承是真正的 `unset`；
+- 不整块覆盖 Provider；
+- revision 过期时由 DSH 拒绝旧写入；
+- 未编辑字段保持原样。
 
 ## 安全边界
 
@@ -245,27 +188,43 @@ settingsScope.mutate(ops, expectedRevision)
 - 测试请求复用 DSH 现有 Provider / credential 通路；
 - 不扫描或偷偷测试所有 Provider；
 - 不按模型名自动开启多模态；
-- 视觉测试只使用插件自带的小型固定 PNG；
+- 视觉测试只使用插件自带固定 PNG；
 - 不自动上传用户本地文件；
-- 所有能力修改都必须由用户明确保存。
+- 所有模型能力修改都必须由用户明确保存。
 
-当前 Host 诊断接口为：
+Host 诊断接口：
 
 ```text
 /plugins/dsh-model-mgr/probe
 ```
 
-它只接受 `provider`、`model` 和 `kind: text|vision`，凭据始终留在 Harness Host。后续版本会继续收紧诊断 transport 的访问控制边界。
+只接受 `provider`、`model` 和 `kind: text|vision`。
 
-## 当前范围
+## 安装 / 升级
 
-MVP 只管理 `llm-pi-ai` family，适合 OpenAI-compatible 自建服务、vLLM、LM Studio、自建 gateway 以及其他 pi-ai 路由。
+Web profile：
 
-暂不统一管理 Codex OAuth、DeepSeek 专用 adapter 或所有未来 adapter。
+```bash
+dsh plugin --profile web add github:rffanlab/dsh-model-mgr
+```
+
+升级：
+
+```bash
+dsh plugin --profile web update dsh-model-mgr
+```
+
+如果安装在 default profile：
+
+```bash
+dsh plugin --profile default update dsh-model-mgr
+```
+
+升级后建议重启 DSH Web Host，并浏览器 `Ctrl+F5` 强制刷新。
 
 ## 开发
 
-要求 Node.js 20+。
+Node.js 20+：
 
 ```bash
 npm test
@@ -273,33 +232,44 @@ npm run check
 npm run packcheck
 ```
 
-当前测试覆盖：输入能力映射、继承 unset、显式 `models` 的 nested path、catalog `modelOverrides` 路径、正整数校验、视觉诊断分层，以及 Web client bundle 的实际加载和两个 UI slot 注册。
+当前测试覆盖：
+
+- inherit / text / text+image 映射；
+- 显式 `models` nested path；
+- catalog `modelOverrides`；
+- 正整数校验；
+- 两个 UI slot 的 bundle smoke test；
+- Provider / 模型默认折叠；
+- 禁止普通 Provider 级“保存默认值”控件；
+- 内置 PNG 的 signature、chunk 完整性和 IDAT 解压。
 
 ## 项目结构
 
 ```text
 dsh-model-mgr/
 ├─ src/
-│  ├─ core.js       # 配置路径/能力纯逻辑
-│  ├─ probe.js      # Host 文本/视觉诊断
-│  └─ plugin.js     # Host 插件入口
+│  ├─ core.js
+│  ├─ vision-fixture.js
+│  ├─ probe.js
+│  └─ plugin.js
 ├─ lib/
-│  └─ client.js     # DSH lazy-CJS Web client
+│  └─ client.js
 ├─ test/
 │  ├─ core.test.js
-│  └─ client-bundle.test.js
-├─ README.md        # 默认中文
-├─ README.en.md     # English
-├─ package.json
-└─ cordis.patch.yml
+│  ├─ client-bundle.test.js
+│  └─ vision-fixture.test.js
+├─ README.md
+├─ README.en.md
+└─ package.json
 ```
 
 ## 设计原则
 
 1. **DSH 原生 settings 是唯一事实源。**
-2. **声明能力与实际测试结果分开。**
-3. **默认保守：不声明视觉就按纯文本处理。**
-4. **不 Fork DSH，不 hack React DOM，不创建 shadow config。**
+2. **模型能力默认按单模型声明，不扩大到整个 Provider。**
+3. **声明能力与实际测试结果分开。**
+4. **默认保守。**
+5. **不 Fork DSH，不 hack React DOM，不创建 shadow config。**
 
 ## License
 
