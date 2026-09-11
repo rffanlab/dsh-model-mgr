@@ -1,7 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  assertSettingsPath,
   classifyVisionResult,
+  createExplicitModelOp,
   createInputOp,
   modelFieldPath,
   normalizeInput,
@@ -10,23 +12,45 @@ import {
   resolveEditableModels,
 } from '../src/core.js'
 
-test('input modes preserve inherit semantics', () => {
+test('input modes preserve inherit semantics with string-only settings paths', () => {
   assert.equal(normalizeInput(undefined), 'inherit')
   assert.equal(normalizeInput(['text']), 'text')
   assert.equal(normalizeInput(['text', 'image']), 'vision')
-  assert.deepEqual(createInputOp(['providers', 'local', 'models', 0, 'input'], 'inherit'), {
-    op: 'unset', path: ['providers', 'local', 'models', 0, 'input'],
+  assert.deepEqual(createInputOp(['providers', 'local', 'modelOverrides', 'qwen', 'input'], 'inherit'), {
+    op: 'unset', path: ['providers', 'local', 'modelOverrides', 'qwen', 'input'],
   })
   assert.deepEqual(createInputOp(['x'], 'vision'), { op: 'set', path: ['x'], value: ['text', 'image'] })
+  assert.throws(() => assertSettingsPath(['providers', 'local', 'models', 0, 'input']), /string segments/)
 })
 
-test('explicit models use a nested array path without replacing the model', () => {
-  const profile = { models: [{ id: 'qwen', contextWindow: 131072, maxTokens: 32768, compat: { foo: true } }] }
+test('explicit model edits replace the models array while preserving unknown fields', () => {
+  const profile = {
+    models: [
+      { id: 'qwen', contextWindow: 131072, maxTokens: 32768, compat: { foo: true }, reasoning: { effort: 'high' } },
+      { id: 'other', compat: { untouched: true } },
+    ],
+  }
   const [model] = resolveEditableModels(profile)
   assert.equal(model.kind, 'models')
-  assert.deepEqual(modelFieldPath(['providers', 'local'], model, 'input'), ['providers', 'local', 'models', 0, 'input'])
+  assert.throws(
+    () => modelFieldPath(['providers', 'local'], model, 'input'),
+    /Replace the models array/,
+  )
+
+  const op = createExplicitModelOp(['providers', 'local'], profile.models, 0, {
+    input: ['text', 'image'],
+    contextWindow: 128000,
+    maxTokens: undefined,
+  })
+  assert.deepEqual(op.path, ['providers', 'local', 'models'])
+  assert.ok(op.path.every(segment => typeof segment === 'string'))
+  assert.deepEqual(op.value[0].input, ['text', 'image'])
+  assert.equal(op.value[0].contextWindow, 128000)
+  assert.equal('maxTokens' in op.value[0], false)
+  assert.deepEqual(op.value[0].compat, { foo: true })
+  assert.deepEqual(op.value[0].reasoning, { effort: 'high' })
+  assert.deepEqual(op.value[1], profile.models[1])
   assert.deepEqual(providerFieldPath(['providers', 'local'], 'defaultInput'), ['providers', 'local', 'defaultInput'])
-  assert.deepEqual(profile.models[0].compat, { foo: true })
 })
 
 test('catalog providers use modelOverrides as the minimal write surface', () => {
