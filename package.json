@@ -1,6 +1,6 @@
 {
   "name": "dsh-model-mgr",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Native model capability GUI and text/vision diagnostics for DeepSeek Harness",
   "type": "module",
   "main": "./src/plugin.js",
