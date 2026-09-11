@@ -1,16 +1,14 @@
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { VISION_SENTINEL, VISION_TEST_PNG_BASE64 } from './vision-fixture.js'
 
 export const PROBE_PATH = '/plugins/dsh-model-mgr/probe'
-export const VISION_SENTINEL = 'VISION_427'
 const MAX_BODY_BYTES = 16 * 1024
-const TEST_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAUAAAABgCAIAAADjKTx/AAAE80lEQVR4nO3Y30uTexzA8aczKQZJBk5I77zZyPDXkNL5PGythhdFoGjRRSjdSeJdF0J4F/0JZWzOG8XY8KIfZM3GQqVuJt64oF01HaiY0kbWSr9dPOc8jHM6nsM5C/no+3X1fH9sz74X7z26I0opDYBMv+33BwDw3xEwIBgBA4IRMCAYAQOCETAgGAEDghEwIBgBA4IRMCAYAQOCETAgGAEDghEwIBgBA4IRMCAYAQOCETAgGAEDghEwIBgBA4IRMCAYAQOCETAgGAEDghEwIBgBA4IRMCAYAQOCETAgGAEDghEwIBgBA4IRMCAYAQOCETAgGAEDghEwIBgBA4IRMCAYAQOCETAg2AEM+Pbt28Fg0BoGAoHFxcWKigpzmEwmA4GAz+e7ePFiJpPRNM1aGh0ddbvdra2tbrd7bGzMnLTb7T6fz3o3a/NPPXv2zG63m9ehUEjX9cbGxhcvXmiadu3aNa/X6/V629raKisrS3NUQB04iUSiq6vLvM7lck6nUyl14sQJc6ahoSGTySilIpFIT0+PtfT8+XOPx7O5uamU2tzc9Hg8L1++NFfb29vj8bj5cut9/urTp0+fra2tWTOGYbx7965UxwQO4BNY07SOjo6ZmZmFhYWmpqaysjJrfn19fX5+/uTJk319fbFY7P79+9bS6dOnk8mkNUwmk3V1ddbQ6/XabLZXr1799HbRaDSXy12/ft3r9ebz+Rs3bmials/nr169GgwGHQ6Hue3t27cVFRVOp7O0h8Whtt/fIL+Kz+e7detWNBo1h+aDcX19vaam5sOHD0qpVCrV0tJiLU1PT3s8nq2tLfXHj1ixWEwVPVETiUR7e/se/wMX32h3d7ezs3N8fLx4qbOzM5FIlOqAgFKq7J8Tl+nSpUvDw8P37t0rnqysrBwZGenu7rbb7TabLRQKWUuBQGB5ednn8x07dqxQKAwMDPj9/uLXGoZx9OjRr1+//pu7h8Ph6enpjY2NBw8eHD9+/MmTJ+l0OpvNGoZRktMBpiNKqf3+DPKEw+FwOGxe9/b29vb27uenwSFGwIBgB/NHLOCQIGBAMAIGBCNgQDACBgQjYEAwAgYEI2BAMAIGBCNgQDACBgQjYEAwAgYEI2BAMAIGBCNgQDACBgQjYEAwAgYEI2BAMAIGBCNgQDACBgQjYEAwAgYEI2BAMAIGBCNgQDACBgQjYEAwAgYEI2BAMAIGBCNgQDACBgQjYEAwAgYEI2BAMAIGBCNgQDACBgQjYE+wGtuO8AGvfWYQAAAABJRU5ErkJggg=='
 
 function writeJson(res, status, value) {
-  const body = JSON.stringify(value)
   res.statusCode = status
   res.setHeader('content-type', 'application/json; charset=utf-8')
   res.setHeader('cache-control', 'no-store')
-  res.end(body)
+  res.end(JSON.stringify(value))
 }
 
 async function readJson(req) {
@@ -60,24 +58,22 @@ function errorView(error) {
 
 function imageInput() {
   return {
-    data: new Uint8Array(Buffer.from(TEST_PNG_BASE64, 'base64')),
+    data: new Uint8Array(Buffer.from(VISION_TEST_PNG_BASE64, 'base64')),
     mediaType: 'image/png',
     name: 'dsh-model-mgr-vision-test.png',
   }
 }
 
 /**
- * Build admitted image content across DSH attachment API generations.
- * Newer Harness exposes admitPromptContent(); older deployments may only
- * expose saveImages() or saveImage(). All branches end in the same durable
- * ImageAttachmentRef consumed by ctx.llm.
+ * Admit the fixed probe image across DSH attachment API generations.
+ * Every branch ends in durable prompt content accepted by ctx.llm.
  */
 export async function admitVisionPrompt(attachments) {
   const text = { type: 'text', text: '请读取图片里的大写英文和数字，只返回内容。' }
   if (typeof attachments?.admitPromptContent === 'function') {
     return attachments.admitPromptContent([
       text,
-      { type: 'image', mediaType: 'image/png', data: TEST_PNG_BASE64, name: 'dsh-model-mgr-vision-test.png' },
+      { type: 'image', mediaType: 'image/png', data: VISION_TEST_PNG_BASE64, name: 'dsh-model-mgr-vision-test.png' },
     ])
   }
 
@@ -184,9 +180,7 @@ export async function runVisionProbe(ctx, provider, model) {
       latencyMs: Math.round(performance.now() - started),
       text,
       recognized,
-      message: recognized
-        ? '视觉通路正常。'
-        : '请求成功且图片通路已走通，但视觉识别结果不符合预期。',
+      message: recognized ? '视觉通路正常。' : '请求成功且图片通路已走通，但视觉识别结果不符合预期。',
     }
   } catch (error) {
     return {
@@ -218,9 +212,7 @@ export function createProbeHandler(ctx) {
         writeJson(res, 400, { ok: false, error: { message: 'provider, model and kind(text|vision) are required' } })
         return
       }
-      const result = kind === 'vision'
-        ? await runVisionProbe(ctx, provider, model)
-        : await runTextProbe(ctx, provider, model)
+      const result = kind === 'vision' ? await runVisionProbe(ctx, provider, model) : await runTextProbe(ctx, provider, model)
       writeJson(res, 200, result)
     } catch (error) {
       writeJson(res, 200, { ok: false, layer: 'provider', error: errorView(error) })
