@@ -1,5 +1,5 @@
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { VISION_SENTINEL, VISION_TEST_PNG_BASE64 } from './vision-fixture.js'
+import { VISION_SENTINEL, VISION_TEST_PNG_BASE64, VISION_TEST_PNG_BYTES } from './vision-fixture.js'
 
 export const PROBE_PATH = '/plugins/dsh-model-mgr/probe'
 const MAX_BODY_BYTES = 16 * 1024
@@ -58,7 +58,7 @@ function errorView(error) {
 
 function imageInput() {
   return {
-    data: new Uint8Array(Buffer.from(VISION_TEST_PNG_BASE64, 'base64')),
+    data: new Uint8Array(VISION_TEST_PNG_BYTES),
     mediaType: 'image/png',
     name: 'dsh-model-mgr-vision-test.png',
   }
