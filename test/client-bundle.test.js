@@ -8,6 +8,7 @@ async function loadBundle() {
   let descriptor
   vm.runInNewContext(code, {
     console,
+    structuredClone,
     window: {
       __ModuleLoader__: {
         load(value) { descriptor = value },
