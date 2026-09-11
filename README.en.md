@@ -2,80 +2,26 @@
 
 [中文](README.md) | English
 
-**A practical GUI for DeepSeek Harness native model settings: manage input modalities, Context Window, Max Tokens, and verify text/vision paths without hand-editing YAML.**
+A lightweight GUI for DeepSeek Harness native model configuration: manage input modalities, Context Window, Max Tokens **per model**, and verify text/vision paths directly.
 
-The default project documentation is the Chinese [`README.md`](README.md). This file is the English version.
-
-> “Multimodal (text + image)” means **declaring to DSH that the model/endpoint accepts image input**. It cannot make a text-only model or inference server magically gain vision support.
+> “Text + image” only declares that a specific model/endpoint accepts image input. It cannot give vision capability to a text-only model or inference server.
 
 ## Current release
 
-Current version: **0.1.1**.
+Current version: **0.1.4**.
 
-0.1.1 fixes the case where the first Web UI build could disappear entirely and now provides two entry points:
+0.1.4 focuses on lower intrusion and a reliable vision probe:
 
-1. **Primary:** Settings → Models → an llm-pi-ai Provider → Model capabilities · dsh-model-mgr
-2. **Compatibility:** Settings → Plugins → Model capabilities
+- the normal Provider-level “default multimodal” editor is removed;
+- `input` is changed per model only;
+- Provider capability panels and model rows both start collapsed;
+- legacy `defaultInput: [text, image]` values are detected and shown with an explicit cleanup action instead of being silently changed;
+- the previously truncated probe PNG is replaced;
+- CI now validates PNG chunks and inflates IDAT data so a malformed fixture cannot ship again.
 
-Both surfaces edit the same native DSH `llm-pi-ai` settings. There is no shadow configuration.
+## Entry points
 
-## Features
-
-The current release covers P0–P4 of the development plan:
-
-- Extends the official `settings.models.provider-card` keyed slot without modifying Harness Web core.
-- Adds a `settings.plugins.tab` compatibility entry so a Models-page slot mismatch does not leave the plugin with no UI.
-- Reads and writes only native DSH `llm-pi-ai` settings; no shadow model database.
-- Provider `defaultInput`: text or text + image.
-- Per-model `input`: inherit, text, or text + image.
-- `contextWindow` and `maxTokens` editing.
-- Revision-aware writes through `settingsScope.mutate(..., expectedRevision)`.
-- Nested patches for explicit `models`, preserving unrelated fields.
-- Minimal `modelOverrides.<modelId>` patches for catalog-backed providers instead of copying the catalog.
-- One-click text connectivity probe.
-- One-click vision-path probe.
-- Vision diagnostics separated into DSH declaration, provider/inference-server, and model-recognition layers.
-- API keys never enter the plugin UI.
-
-Reasoning / Thinking is intentionally deferred. In DSH it also involves reasoning efforts, thinking formats, chat-template kwargs, and provider-specific protocol behavior, so a simple on/off switch would be misleading.
-
-## Installation
-
-Default profile:
-
-```bash
-dsh plugin --profile default add github:rffanlab/dsh-model-mgr
-```
-
-Web profile:
-
-```bash
-dsh plugin --profile web add github:rffanlab/dsh-model-mgr
-```
-
-### Upgrade from 0.1.0
-
-If the first release is already installed:
-
-```bash
-dsh plugin --profile web update dsh-model-mgr
-```
-
-Or, when installed in the default profile:
-
-```bash
-dsh plugin --profile default update dsh-model-mgr
-```
-
-Then **restart the DSH Web Host and perform one hard browser refresh (Ctrl+F5)**. The package version was bumped to 0.1.1 so an existing install does not keep stale 0.1.0 client bytes.
-
-`cordis.patch.yml` activates the Host half and `dsh.client` loads the Web client.
-
-## Usage
-
-### Primary Models entry
-
-Open:
+Primary:
 
 ```text
 Settings
@@ -84,11 +30,7 @@ Settings
 → Model capabilities · dsh-model-mgr
 ```
 
-The capability editor is rendered directly inside that Provider's native card.
-
-### Compatibility Plugins entry
-
-If the current Harness build changes or omits the Models provider-card extension seat, open:
+Compatibility entry:
 
 ```text
 Settings
@@ -96,39 +38,56 @@ Settings
 → Model capabilities
 ```
 
-This view lists configured `llm-pi-ai.providers.*` and exposes the same capability editor.
+Both edit the same native DSH `llm-pi-ai` settings. There is no shadow configuration.
 
-If **neither entry appears**, the issue is not a Provider setting. It means the Web client bundle is not loaded by the active profile. Update the plugin in the correct profile, restart the Web Host, hard-refresh the browser, and confirm which profile owns the plugin.
+## Interaction
 
-## Provider default input
+The UI uses two disclosure levels. The whole plugin panel starts collapsed:
 
-The UI writes either:
-
-```yaml
-defaultInput: [text]
+```text
+Model capabilities · dsh-model-mgr                 >
 ```
 
-or:
+After opening it, model rows are still collapsed:
 
-```yaml
-defaultInput: [text, image]
+```text
+qwen3.8-27b · Inherit DSH default/catalog          >
+qwen-vl      · Text + image                        >
 ```
 
-`defaultInput` is a fallback. It does not forcibly override a model's explicit `input`.
+Opening a model reveals:
+
+- input capability
+- Context Window
+- Max Tokens
+- Test text
+- Test vision
+- Save / Restore inheritance
 
 ## Per-model input capability
 
 | UI | Native DSH write semantics |
 |---|---|
-| Inherit default | `unset` the model's explicit `input` |
+| Inherit DSH default/catalog | `unset` the model's own `input` |
 | Text only | `input: [text]` |
-| Multimodal (text + image) | `input: [text, image]` |
+| Text + image | `input: [text, image]` |
 
-The plugin never infers capabilities from names such as `Qwen-VL` or `Vision`.
+The plugin never infers capability from names such as `Qwen-VL` or `Vision`.
 
-## Catalog-backed vs explicit models
+For explicit self-hosted `models`, the target model is patched directly:
 
-For a provider that uses the pi-ai catalog and has no explicit `models` list, the plugin uses a minimal override:
+```yaml
+llm-pi-ai:
+  providers:
+    local-vllm:
+      models:
+        - id: qwen-model
+          input: [text, image]
+          contextWindow: 131072
+          maxTokens: 32768
+```
+
+For catalog-backed Providers, the plugin uses minimal `modelOverrides`:
 
 ```yaml
 llm-pi-ai:
@@ -140,119 +99,132 @@ llm-pi-ai:
           contextWindow: 131072
 ```
 
-For a self-hosted provider with explicit models:
+Writes use nested path operations, so changing `input` does not erase unrelated `compat`, reasoning, or other fields.
+
+## Provider defaults
+
+Starting with 0.1.4, the plugin **does not expose a normal Provider-level `defaultInput` editor**.
+
+DSH itself defaults `defaultInput` to `[text]`, and it is only a fallback. This plugin is intended to declare capability per model, so it no longer encourages turning an entire Provider into a multimodal route family.
+
+If an earlier plugin version already wrote:
 
 ```yaml
-llm-pi-ai:
-  providers:
-    local-vllm:
-      models:
-        - id: qwen-model
-          contextWindow: 131072
-          maxTokens: 32768
-          input: [text, image]
+defaultInput: [text, image]
 ```
 
-Writes use nested path operations, so changing `input` does not erase `compat`, reasoning settings, or other untouched fields.
+the capability panel shows a warning and an explicit action:
 
-A model-catalog failure no longer removes the capability UI. For explicit `models` providers, 0.1.1 falls back to the native settings model list.
+```text
+Clear Provider-wide multimodal default
+```
+
+That action unsets `defaultInput`, returning the route to native DSH default/catalog behavior. No automatic migration mutates user settings.
 
 ## Text probe
 
-Click **Test text** to send a minimal request through the currently configured DSH `ctx.llm` route:
+**Test text** sends a minimal request through the currently configured DSH `ctx.llm` route:
 
 ```text
 只回复 MODEL_OK
 ```
 
-The UI reports visible output, latency, and provider errors. Exact `MODEL_OK` matching is only supplementary; this is a connectivity test, not a generation-quality benchmark.
+The UI reports success, latency, and Provider errors.
 
 ## Vision probe
 
-Click **Test vision** and the Host performs these steps:
+**Test vision** performs these steps:
 
-1. Resolve the exact route with `ctx.llm.resolveModelInfo(provider, model)`.
-2. If `inputModalities` does not contain `image`, return a **DSH-layer failure** without sending an image.
-3. Otherwise admit the plugin's small fixed PNG through `ctx.attachments.admitPromptContent()`.
-4. The image contains `VISION_427`.
-5. Send that admitted image through the same DSH Provider/Model route.
-6. Separate provider rejection from recognition mismatch.
+1. Resolve the exact model through `ctx.llm.resolveModelInfo(provider, model)`.
+2. If DSH does not declare `image`, stop with a DSH-layer result and do not send an image.
+3. Use the plugin's CI-validated 320×96 RGB PNG containing `VISION_427`.
+4. Admit/store it through the first compatible attachment API:
+   - `admitPromptContent()`
+   - `saveImages()`
+   - `saveImage()`
+5. Send the image through the same Provider / Model route.
+6. Separate DSH attachment failures, Provider inference failures, and recognition mismatches.
 
-### Three required layers
+Diagnostic meaning:
+
+- **DSH layer:** image input is undeclared, or attachment admission/storage fails;
+- **Provider layer:** DSH accepted the image but the inference endpoint rejected or interrupted the request;
+- **Model mismatch:** the request succeeded but the answer did not identify `VISION_427`;
+- **Vision path OK:** the model returned `VISION_427`.
+
+Earlier releases could show:
 
 ```text
-The model supports Vision
-        ↓
-The inference service actually loaded Vision
-        ↓
-DSH declares image input for the route
+Unsupported or malformed image data
 ```
 
-- **DSH layer:** image input is not declared, so no image request is sent.
-- **Provider layer:** DSH permits the image, but the inference server / endpoint rejects or interrupts the request.
-- **Model layer:** the request succeeds, proving the image path works, but the answer does not match `VISION_427`.
+because the bundled PNG was truncated. 0.1.4 replaces it with a complete PNG and adds a decompression-level regression test.
 
-Therefore:
+## Writes and conflicts
 
-```yaml
-input: [text, image]
-```
-
-is a capability declaration, not a “turn vision on” switch.
-
-## Writes and conflict handling
-
-The plugin never reads, regex-edits, or overwrites `settings.yaml` directly. The browser binds the native scope:
+The browser binds only the native namespace:
 
 ```text
 settingsScope.bind({ namespace: "llm-pi-ai" })
 ```
 
-and saves structured nested-path operations with the current revision:
+and writes through:
 
 ```text
 settingsScope.mutate(ops, expectedRevision)
 ```
 
-“Inherit” is represented by a real `unset`, while stale revisions are rejected by the DSH settings mechanism and the current settings are refreshed.
+Therefore:
 
-## 0.1.1 Web UI fix
-
-The first release had two fragile client-side paths:
-
-- it called `ctx.remote.session.modelCatalog()` without explicitly declaring the `remote.session` runtime dependency;
-- an early bundle revision had a loading → ready React Hook-order hazard that could cause the slot error boundary to retire the extension and leave an apparently empty UI.
-
-0.1.1 fixes this by declaring `remote.session`, making catalog loading non-fatal, keeping all Provider-panel hooks unconditional, aligning the lazy-CJS wrapper with the already proven `dsh-subagent-mgr` shape, adding the Plugins compatibility entry, and adding a smoke test that executes the bundle and verifies both slot registrations.
+- inheritance is a real `unset`;
+- the plugin never rebuilds an entire Provider object;
+- stale revisions are rejected by DSH;
+- untouched fields remain untouched.
 
 ## Security boundaries
 
-- Never read, store, or display API keys in browser code.
-- Never read plaintext `.credentials.yaml`.
-- Probes reuse the existing DSH Provider / credential path.
-- Never scan or silently probe every Provider.
-- Never enable multimodal support based on model names.
-- The vision probe uses only the plugin's bundled small fixed PNG.
-- Never upload arbitrary local user files automatically.
-- Capability changes take effect only after an explicit user save.
+- API keys are never read, stored, or displayed by browser code.
+- Plaintext `.credentials.yaml` is never read.
+- Probes reuse DSH's existing Provider / credential path.
+- Providers are never silently scanned or probed.
+- Model names never auto-enable multimodal support.
+- The vision probe uses only the bundled fixed PNG.
+- Arbitrary local user files are never uploaded automatically.
+- Capability mutations require an explicit user save.
 
-The current Host diagnostics endpoint is:
+Host diagnostics endpoint:
 
 ```text
 /plugins/dsh-model-mgr/probe
 ```
 
-It accepts only `provider`, `model`, and `kind: text|vision`; credentials remain on the Harness Host. A later release can further tighten the diagnostics transport access-control boundary.
+It accepts only `provider`, `model`, and `kind: text|vision`.
 
-## Scope
+## Install / upgrade
 
-The MVP manages the `llm-pi-ai` family: self-hosted OpenAI-compatible services, vLLM, LM Studio, custom gateways, and other pi-ai routes.
+Web profile:
 
-It does not attempt to unify Codex OAuth, the dedicated DeepSeek adapter, or every future adapter in v1.
+```bash
+dsh plugin --profile web add github:rffanlab/dsh-model-mgr
+```
+
+Upgrade:
+
+```bash
+dsh plugin --profile web update dsh-model-mgr
+```
+
+If installed in the default profile:
+
+```bash
+dsh plugin --profile default update dsh-model-mgr
+```
+
+After upgrading, restart the DSH Web Host and hard-refresh the browser with `Ctrl+F5`.
 
 ## Development
 
-Node.js 20+ is required.
+Node.js 20+:
 
 ```bash
 npm test
@@ -260,33 +232,44 @@ npm run check
 npm run packcheck
 ```
 
-Tests cover input-mode mapping, inherit-as-unset, nested explicit-model paths, catalog `modelOverrides` paths, positive-integer validation, layered vision classification, and execution of the Web client bundle with verification of both UI slot registrations.
+Current tests cover:
 
-## Project layout
+- inherit / text / text+image mapping;
+- explicit `models` nested paths;
+- catalog `modelOverrides`;
+- positive integer validation;
+- Web client bundle registration;
+- Provider/model collapsed defaults;
+- absence of a normal Provider-level “save default” control;
+- PNG signature, chunk completeness, and IDAT decompression.
+
+## Layout
 
 ```text
 dsh-model-mgr/
 ├─ src/
-│  ├─ core.js       # pure config/capability helpers
-│  ├─ probe.js      # Host text/vision diagnostics
-│  └─ plugin.js     # Host plugin entry
+│  ├─ core.js
+│  ├─ vision-fixture.js
+│  ├─ probe.js
+│  └─ plugin.js
 ├─ lib/
-│  └─ client.js     # DSH lazy-CJS Web client
+│  └─ client.js
 ├─ test/
 │  ├─ core.test.js
-│  └─ client-bundle.test.js
-├─ README.md        # default Chinese docs
-├─ README.en.md     # English docs
-├─ package.json
-└─ cordis.patch.yml
+│  ├─ client-bundle.test.js
+│  └─ vision-fixture.test.js
+├─ README.md
+├─ README.en.md
+└─ package.json
 ```
 
 ## Design principles
 
-1. **Native DSH settings remain the single source of truth.**
-2. **Declared capability and observed probe results stay separate.**
-3. **Conservative by default: no vision declaration means text-only behavior.**
-4. **No DSH fork, no React DOM hacks, and no shadow config.**
+1. **Native DSH settings are the single source of truth.**
+2. **Model capability is configured per model by default, not widened to an entire Provider.**
+3. **Declared capability and observed probe results stay separate.**
+4. **Conservative defaults.**
+5. **No DSH fork, no React DOM hacks, no shadow config.**
 
 ## License
 
