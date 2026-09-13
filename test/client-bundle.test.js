@@ -24,8 +24,8 @@ async function loadBundle() {
   return { code, plugin }
 }
 
-test('client bundle loads and registers primary plus compatibility settings entries', async () => {
-  const { plugin } = await loadBundle()
+test('client bundle registers only the Plugins settings entry', async () => {
+  const { code, plugin } = await loadBundle()
   assert.equal(typeof plugin.apply, 'function')
   assert.ok(plugin.inject.includes('remote.session'))
 
@@ -53,12 +53,11 @@ test('client bundle loads and registers primary plus compatibility settings entr
 
   plugin.apply(ctx)
 
-  assert.deepEqual(injected.sort(), ['settings.models.provider-card', 'settings.plugins.tab'].sort())
-  assert.equal(registered.length, 2)
-  assert.equal(registered[0].options.name, 'settings.models.provider-card')
-  assert.equal(registered[0].options.key, 'llm-pi-ai')
-  assert.equal(registered[1].options.name, 'settings.plugins.tab')
-  assert.equal(registered[1].options.label, '模型能力')
+  assert.deepEqual(injected, ['settings.plugins.tab'])
+  assert.equal(registered.length, 1)
+  assert.equal(registered[0].options.name, 'settings.plugins.tab')
+  assert.equal(registered[0].options.label, '模型能力')
+  assert.doesNotMatch(code, /settings\.models\.provider-card/)
 })
 
 test('capability UI is collapsed-first and per-model only', async () => {
