@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.6 - 2026-09-13
+
+- Remove the `settings.models.provider-card` integration entirely.
+- Restore **Settings → Models** to the untouched native DeepSeek Harness UI.
+- Keep all dsh-model-mgr controls only under **Settings → Plugins → Model capabilities**.
+- Remove the client dependency on `@deepseek-ai/dsh-client-ui-settings-models`.
+- Keep per-model capability editing, context/max token controls, text/vision probes, legacy Provider-default cleanup, and collapsed Provider/model disclosures in the Plugins settings surface.
+- Add a regression test that fails if the Web bundle ever registers or even references `settings.models.provider-card` again.
+
 ## 0.1.5 - 2026-09-11
 
 - Fix `client api: settings/mutate rejected "ops"` when editing an explicit custom Provider model.
@@ -55,4 +64,3 @@
 - Add Host text and fixed-image vision diagnostics using the existing DSH LLM and attachment paths.
 - Add layered DSH / Provider / recognition diagnostics.
 - Add Chinese default README and English README.
-- Add core unit tests and GitHub Actions CI.
