@@ -8,29 +8,9 @@
 
 ## 当前版本
 
-当前版本：**0.1.4**。
+当前版本：**0.1.6**。
 
-0.1.4 的重点是降低侵入性并修复视觉测试：
-
-- 不再提供 Provider 级“默认多模态”常规开关；
-- 只对单个模型写 `input`；
-- Provider 能力区默认收起，模型行也默认收起；
-- 检测旧版本留下的 `defaultInput: [text, image]` 时，只显示清理提示，不会自动修改；
-- 替换了之前被截断的测试 PNG；
-- CI 会校验 PNG chunk 和 IDAT 解压，避免再次发布坏图片。
-
-## 入口
-
-主入口：
-
-```text
-设置
-→ 模型
-→ 展开一个 llm-pi-ai Provider
-→ 模型能力 · dsh-model-mgr
-```
-
-兼容入口：
+0.1.6 开始，插件**不再修改或扩展「设置 → 模型」页面**。原生模型页面完全交还给 DeepSeek Harness；所有 `dsh-model-mgr` 配置统一放在：
 
 ```text
 设置
@@ -38,43 +18,67 @@
 → 模型能力
 ```
 
-两个入口编辑的是同一份 DSH 原生 `llm-pi-ai` settings，没有第二份配置。
+这样安装插件以后，原生 Provider 卡片、编辑按钮、模型目录等界面都保持 DSH 默认样式，不再出现 `模型能力 · dsh-model-mgr` 的嵌入块。
 
-## 交互
+## 功能
 
-插件采用两级折叠：
+- 只在 **设置 → 插件 → 模型能力** 提供管理界面；
+- 按模型配置 `继承 / 纯文本 / 文本 + 图片`；
+- 按模型配置 `Context Window` 与 `Max Tokens`；
+- Provider 与模型行均默认收起；
+- 文本连通性测试；
+- 视觉通路测试；
+- 视觉失败区分 DSH 图片准入层、Provider/推理服务层、模型识别层；
+- 只读写 DSH 原生 `llm-pi-ai` settings，不创建第二份配置；
+- API Key 不进入插件前端。
 
-```text
-模型能力 · dsh-model-mgr                         >
+## 安装 / 更新
+
+Web profile：
+
+```bash
+dsh plugin --profile web add github:rffanlab/dsh-model-mgr
 ```
 
-点开后才看到模型列表：
+已安装时更新：
 
-```text
-qwen3.8-27b · 继承 DSH 默认/目录                >
-qwen-vl      · 文本 + 图片                      >
+```bash
+dsh plugin --profile web update dsh-model-mgr
 ```
 
-再点某个模型，才显示：
+如果插件装在 default profile：
 
-- 输入能力
-- Context Window
-- Max Tokens
-- 测试文本
-- 测试视觉
-- 保存 / 恢复继承
+```bash
+dsh plugin --profile default update dsh-model-mgr
+```
 
-## 单模型输入能力
+更新后重启 DSH Web Host，并执行一次浏览器强制刷新（Ctrl+F5）。
+
+## 使用
+
+打开：
+
+```text
+设置
+→ 插件
+→ 模型能力
+```
+
+页面会列出当前 `llm-pi-ai.providers.*` Provider。每个 Provider 默认收起，展开后再按模型进行配置。
+
+### 单模型输入能力
 
 | UI | 原生 DSH 写入语义 |
 |---|---|
-| 继承 DSH 默认/目录 | `unset` 模型自己的 `input` |
+| 继承 DSH 默认/目录 | 清除模型自己的 `input` |
 | 纯文本 | `input: [text]` |
 | 多模态（文本 + 图片） | `input: [text, image]` |
 
 插件不会根据 `Qwen-VL`、`Vision` 等名字自动猜能力。
 
-对于显式 `models` 的自建 Provider，会写目标模型本身：
+### 显式 models Provider
+
+DSH 的 settings wire path 只允许 `string[]`，不能把数组下标作为 path 段发送。因此对于自定义 Provider 的显式 `models` 数组，插件会复制完整数组、只修改目标模型并保留其他未知字段，然后一次性写回 `models`：
 
 ```yaml
 llm-pi-ai:
@@ -87,110 +91,73 @@ llm-pi-ai:
           maxTokens: 32768
 ```
 
-对于使用内置 catalog 的 Provider，会使用最小 `modelOverrides`：
+这样不会丢失该模型的 `compat`、reasoning 等插件未编辑字段，也不会影响其他模型行。
+
+### Catalog Provider
+
+使用内置 catalog 的 Provider 继续采用最小覆盖：
 
 ```yaml
 llm-pi-ai:
   providers:
-    my-provider:
+    nvidia:
       modelOverrides:
-        qwen-model:
+        vision-model:
           input: [text, image]
-          contextWindow: 131072
 ```
-
-插件使用 nested path patch，不会为了改 `input` 把 `compat`、reasoning 或其他未编辑字段抹掉。
 
 ## Provider 默认能力
 
-0.1.4 开始，插件**不再提供 Provider 级 `defaultInput` 编辑器**。
+插件不提供 Provider 级 `defaultInput` 编辑器。
 
-DSH 自己的 `defaultInput` 默认是 `[text]`，而且只是 fallback。这个插件的目标是“按模型声明能力”，所以不再鼓励把整个 Provider 一次性改成多模态。
+DSH 的 `defaultInput` 本身是 fallback；这个插件只负责按模型声明能力，避免把整个 Provider 一次性改成多模态。
 
-如果旧版本已经写入：
+如果旧版本留下：
 
 ```yaml
 defaultInput: [text, image]
 ```
 
-能力面板会显示一次警告，并提供：
-
-```text
-清除系列级多模态默认
-```
-
-这个按钮会 `unset defaultInput`，恢复 DSH 原生默认/目录行为；插件不会自动替你修改。
+插件页会显示“清除系列级多模态默认”按钮，由用户明确清理，不会自动修改。
 
 ## 文本测试
 
-点击 **测试文本** 后，Host 通过当前 DSH `ctx.llm` 路由发送最小请求：
+点击 **测试文本** 后，插件通过当前 DSH `ctx.llm` 路由请求模型只回复：
 
 ```text
-只回复 MODEL_OK
+MODEL_OK
 ```
 
-UI 会显示连接是否成功、耗时以及 Provider 错误。
+用于确认 Provider / Model 路由是否可用。
 
 ## 视觉测试
 
 点击 **测试视觉** 后：
 
-1. `ctx.llm.resolveModelInfo(provider, model)` 先确认 DSH 是否声明 `image`；
-2. 没有 `image` 时直接返回 DSH 层失败，不发送图片；
-3. 使用插件内置、CI 校验过的 320×96 RGB PNG，图片内容是 `VISION_427`；
-4. 图片准入兼容以下 DSH attachment API：
-   - `admitPromptContent()`
-   - `saveImages()`
-   - `saveImage()`
-5. 再通过同一 Provider / Model 路由发送视觉请求；
-6. 根据结果区分 DSH、Provider 和模型识别三个层次。
+1. 先确认 DSH 当前把该模型解析为支持 `image` 输入；
+2. 使用插件运行时生成的合法 PNG 测试图；
+3. 图片内容包含 `VISION_427`；
+4. 图片通过当前 Harness attachment 服务准入；
+5. 再经当前 DSH LLM 路由发送给目标模型；
+6. 根据结果区分 DSH、Provider 和模型识别三层问题。
 
-诊断语义：
-
-- **DSH 层失败**：模型未声明图片输入，或图片在 DSH attachment 准入/持久化阶段失败；
-- **Provider 层失败**：图片已经交给 DSH，但推理服务器 / endpoint 拒绝或中断请求；
-- **模型层识别异常**：请求成功，图片通路已经走通，但回答没有识别出 `VISION_427`；
-- **视觉通路正常**：模型成功返回 `VISION_427`。
-
-旧版出现过：
+视觉测试兼容 attachment API：
 
 ```text
-Unsupported or malformed image data
+admitPromptContent() → saveImages() → saveImage()
 ```
 
-原因是插件内置 PNG 数据被截断。0.1.4 已替换为完整 PNG，并新增解压级回归测试。
-
-## 保存与并发
-
-浏览器端只绑定 DSH 原生 namespace：
-
-```text
-settingsScope.bind({ namespace: "llm-pi-ai" })
-```
-
-保存通过：
-
-```text
-settingsScope.mutate(ops, expectedRevision)
-```
-
-所以：
-
-- 恢复继承是真正的 `unset`；
-- 不整块覆盖 Provider；
-- revision 过期时由 DSH 拒绝旧写入；
-- 未编辑字段保持原样。
+CI 会解析 PNG chunk 并解压 IDAT 数据，防止损坏测试图再次进入版本。
 
 ## 安全边界
 
 - 不在前端读取、保存或展示 API Key；
 - 不读取 `.credentials.yaml` 明文；
-- 测试请求复用 DSH 现有 Provider / credential 通路；
-- 不扫描或偷偷测试所有 Provider；
+- 测试请求复用 DSH 当前 Provider / credential 通路；
+- 不自动扫描并测试所有 Provider；
 - 不按模型名自动开启多模态；
-- 视觉测试只使用插件自带固定 PNG；
-- 不自动上传用户本地文件；
-- 所有模型能力修改都必须由用户明确保存。
+- 不自动上传用户本地图片；
+- 所有模型能力修改都需要用户明确保存。
 
 Host 诊断接口：
 
@@ -198,78 +165,24 @@ Host 诊断接口：
 /plugins/dsh-model-mgr/probe
 ```
 
-只接受 `provider`、`model` 和 `kind: text|vision`。
-
-## 安装 / 升级
-
-Web profile：
-
-```bash
-dsh plugin --profile web add github:rffanlab/dsh-model-mgr
-```
-
-升级：
-
-```bash
-dsh plugin --profile web update dsh-model-mgr
-```
-
-如果安装在 default profile：
-
-```bash
-dsh plugin --profile default update dsh-model-mgr
-```
-
-升级后建议重启 DSH Web Host，并浏览器 `Ctrl+F5` 强制刷新。
-
 ## 开发
 
 Node.js 20+：
 
 ```bash
-npm test
 npm run check
+npm test
 npm run packcheck
 ```
 
-当前测试覆盖：
+回归测试覆盖：
 
-- inherit / text / text+image 映射；
-- 显式 `models` nested path；
-- catalog `modelOverrides`；
-- 正整数校验；
-- 两个 UI slot 的 bundle smoke test；
-- Provider / 模型默认折叠；
-- 禁止普通 Provider 级“保存默认值”控件；
-- 内置 PNG 的 signature、chunk 完整性和 IDAT 解压。
-
-## 项目结构
-
-```text
-dsh-model-mgr/
-├─ src/
-│  ├─ core.js
-│  ├─ vision-fixture.js
-│  ├─ probe.js
-│  └─ plugin.js
-├─ lib/
-│  └─ client.js
-├─ test/
-│  ├─ core.test.js
-│  ├─ client-bundle.test.js
-│  └─ vision-fixture.test.js
-├─ README.md
-├─ README.en.md
-└─ package.json
-```
-
-## 设计原则
-
-1. **DSH 原生 settings 是唯一事实源。**
-2. **模型能力默认按单模型声明，不扩大到整个 Provider。**
-3. **声明能力与实际测试结果分开。**
-4. **默认保守。**
-5. **不 Fork DSH，不 hack React DOM，不创建 shadow config。**
+- Web bundle 只能注册 `settings.plugins.tab`，禁止再次注入 `settings.models.provider-card`；
+- Provider / 模型默认收起；
+- 单模型配置；
+- `settings/mutate` 路径必须全部是字符串；
+- 显式 `models` 更新保留未知字段和其他模型；
+- 视觉测试 PNG 完整性与可解压性。
 
 ## License
 
