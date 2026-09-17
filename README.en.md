@@ -4,13 +4,24 @@
 
 A lightweight GUI for DeepSeek Harness native model configuration: manage input modalities, Context Window, Max Tokens **per model**, and verify text/vision paths directly.
 
-> “Text + image” only declares that a specific model/endpoint accepts image input. It cannot add vision capability to a text-only model or inference server.
+> “Text + image” only declares that a specific model/endpoint accepts image input. It cannot give vision capability to a text-only model or inference server.
 
 ## Current release
 
-Current version: **0.1.6**.
+Current version: **0.1.7**.
 
-Starting with 0.1.6, the plugin **no longer modifies or extends Settings → Models**. The native Models page is left entirely to DeepSeek Harness. All dsh-model-mgr controls now live only under:
+0.1.7 fixes an important issue that could interfere with local-model context detection. Earlier builds read the schema-resolved `settingsScope.snapshot.value`, then used those resolved values as the write baseline. Saving only a capability such as image input could therefore materialize DSH-resolved `contextWindow` / `maxTokens` values into the user layer. Since explicit model capacities have higher priority than catalog/default resolution, later DSH upgrades or re-detection could appear to stop working.
+
+Starting with 0.1.7:
+
+- `snapshot.value` is used only to show the **current DSH-resolved result**;
+- writes are based on `snapshot.user`, the **raw user layer**;
+- when the user never configured `contextWindow` / `maxTokens`, those inputs stay blank;
+- blank capacity inputs are not materialized and remain owned by DSH / the catalog;
+- historical explicit capacity overrides are detected and can be removed with **Clear capacity override, restore DSH auto detection**;
+- the native **Settings → Models** page remains untouched; all plugin UI stays under **Settings → Plugins → Model capabilities**.
+
+## Entry point
 
 ```text
 Settings
@@ -18,19 +29,21 @@ Settings
 → Model capabilities
 ```
 
-This keeps the native Provider cards, edit controls, and model catalog UI unchanged.
+The plugin does not inject `settings.models.provider-card`.
 
 ## Features
 
-- UI only under **Settings → Plugins → Model capabilities**.
 - Per-model `inherit / text / text + image` capability control.
-- Per-model Context Window and Max Tokens.
-- Provider cards and model rows start collapsed.
+- Optional per-model `Context Window` and `Max Tokens` overrides.
+- Blank capacity fields remain inherited from DSH / catalog resolution.
+- Shows the current DSH-resolved Context / Max Tokens as read-only hints.
+- Detects explicit capacity overrides and offers explicit cleanup.
+- Provider and model rows start collapsed.
 - Text connectivity probe.
-- Vision-path probe.
-- Layered diagnostics for DSH image admission, Provider/inference service, and model recognition.
-- Native `llm-pi-ai` settings remain the single source of truth.
-- API keys never enter the plugin browser UI.
+- Vision path probe.
+- Vision failures are separated into DSH image admission, provider/inference service, and model-recognition layers.
+- Reads/writes only native `llm-pi-ai` settings; no shadow config.
+- API keys never enter the plugin UI.
 
 ## Install / update
 
@@ -52,50 +65,80 @@ If installed in the default profile:
 dsh plugin --profile default update dsh-model-mgr
 ```
 
-Restart the DSH Web Host afterwards and perform one hard browser refresh (Ctrl+F5).
+Restart the DSH Web Host after updating and perform one hard browser refresh (`Ctrl+F5`).
 
-## Usage
+## Context / Max Tokens inheritance
 
-Open:
+DSH resolves capacity in this order:
 
 ```text
-Settings
-→ Plugins
-→ Model capabilities
+explicit contextWindow / maxTokens on the model entry
+        ↓
+installed catalog model with the same id
+        ↓
+Provider defaultContextWindow / defaultMaxTokens
 ```
 
-The page lists configured `llm-pi-ai.providers.*` entries. Each Provider starts collapsed; expand it and then configure models individually.
+Therefore, once user settings contain:
 
-### Per-model input capability
+```yaml
+models:
+  - id: local-qwen
+    contextWindow: 128000
+    maxTokens: 32000
+```
 
-| UI | Native DSH semantics |
+those explicit values win over later catalog/default resolution.
+
+0.1.7 keeps the two kinds of values separate in the UI:
+
+- **Input value**: a real user override.
+- **Current DSH-resolved value**: display-only; saving multimodal capability does not write it back.
+
+When upgrading from 0.1.6 or older, if a local model still reports the wrong context, expand that model. If the UI says it has a manual capacity override, click:
+
+```text
+Clear capacity override, restore DSH auto detection
+```
+
+That action removes only `contextWindow` / `maxTokens`. It preserves `input`, `compat`, reasoning metadata, and other model fields.
+
+## Per-model input capability
+
+| UI | Native DSH write semantics |
 |---|---|
-| Inherit DSH default/catalog | clear the model's own `input` |
+| Inherit DSH default/catalog | clear the model's explicit `input` |
 | Text only | `input: [text]` |
 | Text + image | `input: [text, image]` |
 
-The plugin never infers capability from names such as `Qwen-VL` or `Vision`.
+The plugin never infers capabilities from names such as `Qwen-VL` or `Vision`.
 
-### Explicit `models` providers
+## Explicit `models` providers
 
-DSH settings wire paths accept `string[]` only, so array indexes cannot be sent as path segments. For an explicit custom `models` array, the plugin clones the full array, changes only the selected model while preserving unknown fields, and writes the complete `models` value back once:
+DSH settings wire paths are `string[]`, so array indices cannot be sent as path segments. For an explicit `models` array, the plugin writes a cloned **raw user array**, changes only the selected row, and writes the array back.
+
+The important 0.1.7 rule is that the write baseline is no longer the DSH-resolved array. Resolved capacities therefore cannot be accidentally frozen into user settings.
+
+If raw user settings contain only:
 
 ```yaml
-llm-pi-ai:
-  providers:
-    local-vllm:
-      models:
-        - id: qwen-model
-          input: [text, image]
-          contextWindow: 131072
-          maxTokens: 32768
+models:
+  - id: local-qwen
 ```
 
-This preserves fields such as `compat`, reasoning metadata, and untouched sibling models.
+enabling image input produces:
 
-### Catalog-backed providers
+```yaml
+models:
+  - id: local-qwen
+    input: [text, image]
+```
 
-Catalog-backed routes continue to use minimal overrides:
+It does **not** add `contextWindow` or `maxTokens` unless the user explicitly entered them.
+
+## Catalog-backed providers
+
+Catalog-backed providers still use minimal `modelOverrides`:
 
 ```yaml
 llm-pi-ai:
@@ -106,46 +149,44 @@ llm-pi-ai:
           input: [text, image]
 ```
 
-## Provider defaults
+Leaving capacity inputs blank keeps those override fields absent, so the installed catalog continues to own the capacity.
+
+## Provider default capability
 
 The plugin does not expose a Provider-level `defaultInput` editor.
 
-If an older plugin release left:
+If an older release left:
 
 ```yaml
 defaultInput: [text, image]
 ```
 
-the Plugins page shows an explicit cleanup action. It never changes that value silently.
+the Plugins page shows an explicit cleanup action instead of changing it silently.
 
 ## Text probe
 
-**Test text** sends a minimal request through the current DSH `ctx.llm` route asking the model to return:
+**Test text** sends a minimal request through the current DSH `ctx.llm` route and asks the model to answer:
 
 ```text
 MODEL_OK
 ```
 
-This checks Provider/model routing without exposing credentials to the browser.
-
 ## Vision probe
 
 **Test vision**:
 
-1. verifies that DSH currently resolves the model as accepting `image` input;
-2. generates a valid PNG probe image at runtime;
-3. embeds `VISION_427` in that image;
+1. checks whether DSH currently resolves the model as accepting `image` input;
+2. generates a valid PNG test image at runtime;
+3. embeds `VISION_427` in the image;
 4. admits the image through the current Harness attachment service;
-5. sends it through the configured DSH LLM route;
-6. separates DSH, Provider, and recognition-layer failures.
+5. sends it through the current DSH LLM route;
+6. separates DSH, provider, and model-recognition failures.
 
-Attachment API compatibility order:
+Attachment API compatibility:
 
 ```text
 admitPromptContent() → saveImages() → saveImage()
 ```
-
-CI parses PNG chunks and inflates IDAT data so malformed probe images cannot ship unnoticed.
 
 ## Security boundaries
 
@@ -153,9 +194,9 @@ CI parses PNG chunks and inflates IDAT data so malformed probe images cannot shi
 - Never read plaintext `.credentials.yaml`.
 - Probes reuse the current DSH Provider / credential path.
 - Never silently probe every Provider.
-- Never enable multimodal support from model names.
-- Never upload arbitrary local user files automatically.
-- Capability changes require an explicit save.
+- Never enable multimodal support based on model names.
+- Never upload arbitrary local user images automatically.
+- Never auto-delete historical capacity overrides; cleanup requires an explicit user action.
 
 Host diagnostics endpoint:
 
@@ -175,12 +216,13 @@ npm run packcheck
 
 Regression tests cover:
 
-- the Web bundle registers only `settings.plugins.tab` and never `settings.models.provider-card`;
+- only registering `settings.plugins.tab`;
 - collapsed Provider/model UI;
-- per-model settings behavior;
 - string-only `settings/mutate` paths;
-- explicit-model updates preserving unknown fields and siblings;
-- valid, decodable vision probe PNG data.
+- preserving unknown fields and sibling models in explicit arrays;
+- **never materializing resolved capacities into the user layer**;
+- capacity cleanup removing only `contextWindow` / `maxTokens`;
+- vision PNG integrity and IDAT decompression.
 
 ## License
 
