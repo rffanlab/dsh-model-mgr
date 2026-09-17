@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.7 - 2026-09-17
+
+- Fix local-model context-window drift caused by writing DSH-resolved capacity values back into the user settings layer.
+- Separate `settingsScope.snapshot.value` (effective/resolved display state) from `settingsScope.snapshot.user` (raw user-owned write baseline).
+- Keep `contextWindow` and `maxTokens` inputs blank when the user never explicitly configured them; saving image/text capability no longer materializes DSH/catalog capacity values.
+- Show the current DSH-resolved Context Window / Max Tokens as read-only hints.
+- Detect explicit model-capacity overrides left by older plugin releases and provide a per-model **clear capacity override / restore DSH auto detection** action.
+- Capacity cleanup removes only `contextWindow` / `maxTokens`, preserving `input`, `compat`, reasoning metadata, and sibling rows.
+- Refuse to rebuild an explicit `models` array from a schema-resolved/effective array when no raw user-owned array exists, avoiding another path for freezing inferred defaults.
+- Add regressions proving that saving only multimodal capability does not add resolved capacity fields to user settings.
+
 ## 0.1.6 - 2026-09-13
 
 - Remove the `settings.models.provider-card` integration entirely.
