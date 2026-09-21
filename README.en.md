@@ -2,13 +2,33 @@
 
 [中文](README.md) | English
 
-A lightweight GUI for DeepSeek Harness native model configuration: manage input modalities, Context Window, Max Tokens **per model**, and verify text/vision paths directly.
+> [!IMPORTANT]
+> **This project is no longer maintained.**
+>
+> Recent DeepSeek Harness releases now provide the main capabilities that originally motivated this plugin, including:
+>
+> - per-model input type configuration (Text / Image);
+> - Context Window;
+> - Max Tokens;
+> - custom Provider model discovery;
+> - model-capacity discovery for local / OpenAI-compatible endpoints.
+>
+> As a result, `dsh-model-mgr` has completed its transitional role and **will not be updated for future DeepSeek Harness releases**.
+>
+> **Use the native Settings → Models experience in the latest DeepSeek Harness instead of installing this plugin.**
+>
+> This repository remains available as a historical implementation and troubleshooting/design reference. If an older plugin release wrote explicit `contextWindow`, `maxTokens`, `defaultInput`, or similar overrides, review and remove obsolete overrides in the native DSH model settings before uninstalling.
 
-> “Text + image” only declares that a specific model/endpoint accepts image input. It cannot give vision capability to a text-only model or inference server.
+## Project status
 
-## Current release
+- Status: **Maintenance stopped**
+- Final release: **0.1.7**
+- Recommended replacement: **DeepSeek Harness native Models settings**
+- Repository purpose: historical implementation, troubleshooting, and design reference
 
-Current version: **0.1.7**.
+## Historical notes
+
+0.1.7 was the final maintained release.
 
 0.1.7 fixes an important issue that could interfere with local-model context detection. Earlier builds read the schema-resolved `settingsScope.snapshot.value`, then used those resolved values as the write baseline. Saving only a capability such as image input could therefore materialize DSH-resolved `contextWindow` / `maxTokens` values into the user layer. Since explicit model capacities have higher priority than catalog/default resolution, later DSH upgrades or re-detection could appear to stop working.
 
@@ -45,7 +65,10 @@ The plugin does not inject `settings.models.provider-card`.
 - Reads/writes only native `llm-pi-ai` settings; no shadow config.
 - API keys never enter the plugin UI.
 
-## Install / update
+## Historical install commands (not recommended)
+
+> [!WARNING]
+> The commands below are retained only for historical reference. Recent DeepSeek Harness releases provide the relevant functionality natively; new installations of this plugin are not recommended.
 
 Web profile:
 
