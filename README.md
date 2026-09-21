@@ -2,13 +2,33 @@
 
 中文 | [English](README.en.md)
 
-给 DeepSeek Harness 的原生模型配置补一个轻量 GUI：**按模型**管理输入模态、Context Window、Max Tokens，并直接验证文本与视觉通路。
+> [!IMPORTANT]
+> **本项目已停止维护。**
+>
+> DeepSeek Harness 已在新版中原生集成本插件最主要的能力，包括：
+>
+> - 模型输入类型配置（Text / Image）；
+> - Context Window；
+> - Max Tokens；
+> - 自定义 Provider 的模型发现；
+> - 本地 / OpenAI-compatible 端点的模型容量识别。
+>
+> 因此 `dsh-model-mgr` 已完成阶段性使命，**不再继续适配后续 DeepSeek Harness 版本**。
+>
+> **建议直接使用最新版 DeepSeek Harness 自带的「设置 → 模型」功能，不再安装本插件。**
+>
+> 本仓库保留作为历史实现与参考。如果旧版本插件曾写入过 `contextWindow`、`maxTokens`、`defaultInput` 等显式覆盖，卸载前建议先在 DSH 原生模型设置中确认并清理不再需要的覆盖项。
 
-> “文本 + 图片”只是向 DSH 声明这个模型/端点接受图片输入，不会让原本不支持视觉的模型或推理服务凭空获得 Vision。
+## 项目状态
 
-## 当前版本
+- 状态：**停止维护 / Maintenance stopped**
+- 最后版本：**0.1.7**
+- 推荐替代：**DeepSeek Harness 原生 Models 设置**
+- 仓库用途：历史实现、问题排查与设计参考
 
-当前版本：**0.1.7**。
+## 历史说明
+
+0.1.7 是本插件停止维护前的最后版本。
 
 0.1.7 修复了一个会影响本地模型上下文识别的重要问题：旧版插件读取的是 DSH 已经补完默认值后的 `snapshot.value`，保存模型能力时可能把 DSH 自动解析得到的 `contextWindow` / `maxTokens` 反写进用户配置，导致这些值被固定下来。DSH 后续升级或重新识别模型时，显式容量配置优先级更高，因此看起来像“DSH 识别上下文失效”。
 
@@ -45,7 +65,10 @@
 - 只读写 DSH 原生 `llm-pi-ai` settings，不创建第二份配置；
 - API Key 不进入插件前端。
 
-## 安装 / 更新
+## 历史安装方式（不再推荐）
+
+> [!WARNING]
+> 以下安装命令仅作为历史记录保留。新版 DeepSeek Harness 已原生提供相关功能，不建议新安装本插件。
 
 Web profile：
 
